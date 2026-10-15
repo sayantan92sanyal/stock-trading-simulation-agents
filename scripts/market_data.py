@@ -16,12 +16,18 @@ def get_quote(ticker):
     hist = tk.history(period="5d", interval="1d")
     if hist.empty:
         raise ValueError(f"no price data available for {ticker!r}")
+    hist = hist.dropna(subset=["Close"])
+    if hist.empty:
+        raise ValueError(f"no price data available for {ticker!r}")
     return float(hist["Close"].iloc[-1])
 
 
 def get_history(ticker, period="6mo", interval="1d"):
     tk = yf.Ticker(ticker)
     hist = tk.history(period=period, interval=interval)
+    if hist.empty:
+        raise ValueError(f"no price data available for {ticker!r}")
+    hist = hist.dropna(subset=["Close"])
     if hist.empty:
         raise ValueError(f"no price data available for {ticker!r}")
     records = []

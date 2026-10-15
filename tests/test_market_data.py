@@ -28,6 +28,37 @@ def test_get_quote_returns_last_close():
     assert price == fake_hist["Close"].iloc[-1]
 
 
+def test_get_quote_falls_back_past_nan_latest_bar():
+    fake_hist = _fake_history(n=5)
+    fake_hist.loc[fake_hist.index[-1], ["Open", "High", "Low", "Close"]] = float("nan")
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = fake_hist
+    with patch("market_data.yf.Ticker", return_value=mock_ticker):
+        price = market_data.get_quote("TEST")
+    assert price == fake_hist["Close"].iloc[-2]
+
+
+def test_get_quote_raises_when_all_closes_nan():
+    fake_hist = _fake_history(n=3)
+    fake_hist["Close"] = float("nan")
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = fake_hist
+    with patch("market_data.yf.Ticker", return_value=mock_ticker):
+        with pytest.raises(ValueError):
+            market_data.get_quote("TEST")
+
+
+def test_get_history_drops_nan_close_rows():
+    fake_hist = _fake_history(n=5)
+    fake_hist.loc[fake_hist.index[-1], ["Open", "High", "Low", "Close"]] = float("nan")
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = fake_hist
+    with patch("market_data.yf.Ticker", return_value=mock_ticker):
+        records = market_data.get_history("TEST")
+    assert len(records) == 4
+    assert records[-1]["close"] == fake_hist["Close"].iloc[-2]
+
+
 def test_get_quote_raises_on_empty_history():
     mock_ticker = MagicMock()
     mock_ticker.history.return_value = pd.DataFrame()
