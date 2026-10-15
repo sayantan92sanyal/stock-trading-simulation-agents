@@ -20,7 +20,11 @@
   .turn .body { flex: 1; }
   .turn .who { font-weight: 600; font-size: 13px; }
   .turn .changed { color: #ffb84d; font-size: 11px; margin-left: 6px; }
-  .turn .arg { font-size: 14px; margin-top: 4px; }
+  .turn .arg { font-size: 14px; margin-top: 6px; }
+  .turn .arg .headline { font-weight: 600; color: #fff; }
+  .turn .arg .bullets { margin: 6px 0 0; padding-left: 18px; color: #c7ccd6; }
+  .turn .arg .bullets li { margin-top: 3px; }
+  .turn .arg .rest { margin-top: 6px; color: #c7ccd6; white-space: pre-wrap; }
   #end-banner { margin-top: 20px; padding: 12px; border-radius: 8px; background: #26314a; display: none; }
   #waiting { color: #889; }
 </style>
@@ -48,13 +52,36 @@ const LABELS = {
 let currentDebateId = new URLSearchParams(window.location.search).get("debate");
 let polling = null;
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Expects "<one-line stance>\n\n- bullet\n- bullet"; falls back to plain text
+// for older transcripts recorded before the structured-argument format.
+function renderArgument(text) {
+  const parts = String(text).split(/\n\n+/);
+  const headline = parts[0] || "";
+  const rest = parts.slice(1).join("\n\n");
+  const bulletLines = rest.split("\n").map(l => l.trim()).filter(l => l.startsWith("- "));
+  let html = `<div class="headline">${escapeHtml(headline)}</div>`;
+  if (bulletLines.length) {
+    html += `<ul class="bullets">${bulletLines.map(l => `<li>${escapeHtml(l.slice(2))}</li>`).join("")}</ul>`;
+  } else if (rest.trim()) {
+    html += `<div class="rest">${escapeHtml(rest)}</div>`;
+  }
+  return html;
+}
+
 function renderStatus(participants) {
   const el = document.getElementById("status");
   el.style.display = "flex";
   el.innerHTML = Object.keys(LABELS).map(agent => {
     const p = participants[agent];
     const badgeClass = p.status === "settled" ? "settled" : "arguing";
-    const position = p.position_summary ? p.position_summary : "(no position yet)";
+    const position = p.position_summary ? escapeHtml(p.position_summary) : "(no position yet)";
     return `<div class="participant">
       <img src="${ICONS[agent]}"> <strong>${LABELS[agent]}</strong>
       <span class="badge ${badgeClass}">${p.status === "settled" ? "settled" : "arguing"}</span>
@@ -73,7 +100,7 @@ function renderTranscript(turns) {
           ${t.stance_changed ? '<span class="changed">changed stance</span>' : ''}
           ${t.forced_by_timeout ? '<span class="changed">cut off by timer</span>' : ''}
         </div>
-        <div class="arg">${t.argument}</div>
+        <div class="arg">${renderArgument(t.argument)}</div>
       </div>
     </div>
   `).join("");
