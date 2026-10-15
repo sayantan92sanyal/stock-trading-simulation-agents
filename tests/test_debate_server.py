@@ -72,3 +72,10 @@ def test_api_debate_404_for_unknown_id(running_server):
 def test_unknown_path_returns_404(running_server):
     status, body = _get(running_server, "/not-a-real-route")
     assert status == 404
+
+
+def test_serves_viewer_html_with_debate_query_string(running_server):
+    url = f"http://127.0.0.1:{running_server}/?debate=2026-10-15-some-debate-01"
+    with urllib.request.urlopen(url) as resp:
+        assert resp.status == 200
+        assert b"debate viewer" in resp.read()

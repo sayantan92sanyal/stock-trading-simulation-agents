@@ -5,6 +5,7 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import debate as deb
@@ -37,15 +38,16 @@ class DebateHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/viewer.html":
+        path = urlsplit(self.path).path
+        if path == "/" or path == "/viewer.html":
             self._send_file(VIEWER_HTML, "text/html")
-        elif self.path.startswith("/icons/") and self.path.endswith(".png"):
-            name = self.path[len("/icons/"):]
+        elif path.startswith("/icons/") and path.endswith(".png"):
+            name = path[len("/icons/"):]
             self._send_file(ICONS_DIR / name, "image/png")
-        elif self.path == "/api/debates":
+        elif path == "/api/debates":
             self._send_json(200, deb.list_debates())
-        elif self.path.startswith("/api/debate/"):
-            debate_id = self.path[len("/api/debate/"):]
+        elif path.startswith("/api/debate/"):
+            debate_id = path[len("/api/debate/"):]
             try:
                 self._send_json(200, deb.show_debate(debate_id))
             except FileNotFoundError:
