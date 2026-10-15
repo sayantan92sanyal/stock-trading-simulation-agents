@@ -10,6 +10,7 @@ from pathlib import Path
 
 VALID_AGENTS = ["technical_trader", "fundamental_trader", "retail_investor"]
 VALID_STATUSES = ("continue", "settle")
+VALID_STANCES = ("buy", "hold", "sell")
 TIMEOUT_SECONDS = 300
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -77,7 +78,7 @@ def start_debate(topic):
         "end_time": None,
         "end_reason": None,
         "participants": {
-            agent: {"status": "active", "position_summary": None, "settled_at_turn": None}
+            agent: {"status": "active", "stance": None, "position_summary": None, "settled_at_turn": None}
             for agent in VALID_AGENTS
         },
         "turns": [],
@@ -106,9 +107,11 @@ def _active_count(state):
     return sum(1 for p in state["participants"].values() if p["status"] == "active")
 
 
-def append_turn(debate_id, agent, position_summary, argument, status):
+def append_turn(debate_id, agent, stance, position_summary, argument, status):
     if agent not in VALID_AGENTS:
         raise ValueError(f"unknown agent {agent!r}, must be one of {VALID_AGENTS}")
+    if stance not in VALID_STANCES:
+        raise ValueError(f"stance must be one of {VALID_STANCES}, got {stance!r}")
     if status not in VALID_STATUSES:
         raise ValueError(f"status must be one of {VALID_STATUSES}, got {status!r}")
 
@@ -119,13 +122,14 @@ def append_turn(debate_id, agent, position_summary, argument, status):
     was_lone_holdout = _active_count(state) == 1
     resolved_status = "settle" if was_lone_holdout else status
 
-    prev_position = state["participants"][agent]["position_summary"]
-    stance_changed = prev_position is not None and prev_position != position_summary
+    prev_stance = state["participants"][agent]["stance"]
+    stance_changed = prev_stance is not None and prev_stance != stance
 
     turn_number = len(state["turns"]) + 1
     turn = {
         "turn": turn_number,
         "agent": agent,
+        "stance": stance,
         "position_summary": position_summary,
         "argument": argument,
         "status": resolved_status,
@@ -134,6 +138,7 @@ def append_turn(debate_id, agent, position_summary, argument, status):
         "timestamp": _now_iso(),
     }
     state["turns"].append(turn)
+    state["participants"][agent]["stance"] = stance
     state["participants"][agent]["position_summary"] = position_summary
     if resolved_status == "settle":
         state["participants"][agent]["status"] = "settled"
@@ -201,6 +206,7 @@ def main():
     p_turn = sub.add_parser("turn")
     p_turn.add_argument("debate_id")
     p_turn.add_argument("agent")
+    p_turn.add_argument("--stance", required=True, choices=list(VALID_STANCES))
     p_turn.add_argument("--position", required=True)
     p_turn.add_argument("--argument", required=True)
     p_turn.add_argument("--status", required=True, choices=list(VALID_STATUSES))
@@ -222,7 +228,7 @@ def main():
             print(json.dumps({"next_speaker": next_speaker(args.debate_id)}))
         elif args.command == "turn":
             print(json.dumps(append_turn(
-                args.debate_id, args.agent, args.position, args.argument, args.status,
+                args.debate_id, args.agent, args.stance, args.position, args.argument, args.status,
             )))
         elif args.command == "check-timeout":
             print(json.dumps(check_timeout(args.debate_id)))
