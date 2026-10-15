@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trader Debate</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f1115; color: #e8e8e8; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  #topic { color: #9aa; margin-bottom: 20px; }
+  #status { display: flex; gap: 16px; margin-bottom: 24px; }
+  .participant { flex: 1; background: #1a1d24; border-radius: 8px; padding: 12px; }
+  .participant img { width: 32px; height: 32px; vertical-align: middle; border-radius: 6px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+  .badge.arguing { background: #2a4; color: #fff; }
+  .badge.settled { background: #666; color: #fff; }
+  .position { margin-top: 8px; font-size: 13px; color: #cde; }
+  #transcript { display: flex; flex-direction: column; gap: 12px; }
+  .turn { background: #181b21; border-radius: 8px; padding: 12px 16px; display: flex; gap: 12px; }
+  .turn img { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; }
+  .turn .body { flex: 1; }
+  .turn .who { font-weight: 600; font-size: 13px; }
+  .turn .changed { color: #ffb84d; font-size: 11px; margin-left: 6px; }
+  .turn .arg { font-size: 14px; margin-top: 4px; }
+  #end-banner { margin-top: 20px; padding: 12px; border-radius: 8px; background: #26314a; display: none; }
+  #waiting { color: #889; }
+</style>
+</head>
+<body>
+  <h1>Trader Debate</h1>
+  <div id="topic"></div>
+  <div id="waiting">Waiting for a debate to start...</div>
+  <div id="status" style="display:none"></div>
+  <div id="transcript"></div>
+  <div id="end-banner"></div>
+
+<script>
+const ICONS = {
+  technical_trader: "/icons/technical.png",
+  fundamental_trader: "/icons/fundamental.png",
+  retail_investor: "/icons/retail.png",
+};
+const LABELS = {
+  technical_trader: "Technical Trader",
+  fundamental_trader: "Fundamental Trader",
+  retail_investor: "Retail Investor",
+};
+
+let currentDebateId = new URLSearchParams(window.location.search).get("debate");
+let polling = null;
+
+function renderStatus(participants) {
+  const el = document.getElementById("status");
+  el.style.display = "flex";
+  el.innerHTML = Object.keys(LABELS).map(agent => {
+    const p = participants[agent];
+    const badgeClass = p.status === "settled" ? "settled" : "arguing";
+    const position = p.position_summary ? p.position_summary : "(no position yet)";
+    return `<div class="participant">
+      <img src="${ICONS[agent]}"> <strong>${LABELS[agent]}</strong>
+      <span class="badge ${badgeClass}">${p.status === "settled" ? "settled" : "arguing"}</span>
+      <div class="position">${position}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderTranscript(turns) {
+  const el = document.getElementById("transcript");
+  el.innerHTML = turns.map(t => `
+    <div class="turn">
+      <img src="${ICONS[t.agent]}">
+      <div class="body">
+        <div class="who">${LABELS[t.agent]}
+          ${t.stance_changed ? '<span class="changed">changed stance</span>' : ''}
+          ${t.forced_by_timeout ? '<span class="changed">cut off by timer</span>' : ''}
+        </div>
+        <div class="arg">${t.argument}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderEndBanner(state) {
+  const el = document.getElementById("end-banner");
+  if (state.status !== "complete") {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "block";
+  el.textContent = state.end_reason === "timeout"
+    ? "Debate reached the 5-minute time limit."
+    : "All three traders reached a final position.";
+}
+
+async function pollDebate() {
+  try {
+    const res = await fetch(`/api/debate/${currentDebateId}`);
+    if (res.status === 404) {
+      currentDebateId = null;
+      return;
+    }
+    const state = await res.json();
+    document.getElementById("waiting").style.display = "none";
+    document.getElementById("topic").textContent = state.topic;
+    renderStatus(state.participants);
+    renderTranscript(state.turns);
+    renderEndBanner(state);
+    if (state.status === "complete" && polling) {
+      clearInterval(polling);
+      polling = setInterval(pollLatest, 5000);
+    }
+  } catch (e) {
+    // transient fetch error; try again on next tick
+  }
+}
+
+async function pollLatest() {
+  if (currentDebateId) {
+    pollDebate();
+    return;
+  }
+  try {
+    const res = await fetch("/api/debates");
+    const debates = await res.json();
+    if (debates.length > 0) {
+      currentDebateId = debates[0].debate_id;
+      clearInterval(polling);
+      polling = setInterval(pollDebate, 1500);
+      pollDebate();
+    }
+  } catch (e) {
+    // server not up yet; keep waiting
+  }
+}
+
+if (currentDebateId) {
+  polling = setInterval(pollDebate, 1500);
+  pollDebate();
+} else {
+  polling = setInterval(pollLatest, 5000);
+  pollLatest();
+}
+</script>
+</body>
+</html>
