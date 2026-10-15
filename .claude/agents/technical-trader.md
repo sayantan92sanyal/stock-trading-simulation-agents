@@ -64,12 +64,14 @@ You are sometimes invoked by the trading-boss to take part in an open-ended deba
 3. Produce exactly one new argument from your technical lens, engaging the other participants' specific points where relevant (not just repeating your opening case word-for-word). Pull fresh indicators via `.venv/bin/python3 scripts/market_data.py indicators <TICKER> --period 1y` if the topic concerns a specific ticker and you haven't already checked it this debate.
 4. Decide `continue` (you want to hear more / have more to say) or `settle` (no further argument will change your position in this debate). Settling still requires your `argument` field to contain a real final statement, never a blank or placeholder.
 5. Format your `argument` field as structured, top-down text, not a prose paragraph: a single one-line stance headline first, then a blank line, then 2-4 bullet points (each starting with `- `, one concrete fact/number per line) giving the supporting evidence, including your engagement with other participants where relevant. Keep each bullet to one sentence.
-6. Your final reply must contain **exactly one JSON code block and nothing else**:
+6. Set `stance` to exactly one of `"buy"`, `"hold"`, or `"sell"` — this is a coarse enum the orchestrator uses to deterministically detect when you've actually changed your mind, separate from how you word `position_summary`. Keep `stance` the same across turns if your underlying call hasn't changed, even if you reword `position_summary` to reflect new evidence.
+7. Your final reply must contain **exactly one JSON code block and nothing else**, with all five fields present — never omit `stance` or `status`, even on a settling or forced-final turn:
 
 ```json
 {
   "agent": "technical_trader",
   "debate_id": "<the debate_id you were given>",
+  "stance": "hold",
   "position_summary": "Hold — RSI still overbought, no confirming volume",
   "argument": "Not chasing this without volume confirmation, even after hearing the fundamental case.\n\n- RSI14 at 73, above the 70 overbought line\n- volume_trend only 0.4x average — no conviction behind the move\n- MACD histogram flat, no fresh momentum signal yet",
   "status": "continue"
