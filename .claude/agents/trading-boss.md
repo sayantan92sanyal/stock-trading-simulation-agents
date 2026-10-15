@@ -49,3 +49,17 @@ When the user asks you to review performance (e.g. "review the agents' performan
 - If a trader subagent's final reply isn't valid JSON in the required shape, treat every ticker in its universe as an implicit `hold` for that agent this round, and tell the user that agent's output couldn't be parsed (don't guess at what it meant).
 - If one trader subagent errors out entirely, continue with the other two and report the gap — never abort the whole round over one failure.
 - If a `portfolio.py trade` call is rejected, surface the exact reason to the user; never retry an order with different sizing on an agent's behalf without being asked.
+
+## Running a debate
+
+When the user asks for a debate (e.g. "I want to see a debate on whether I should buy MSFT", "let's debate rotating from tech to defense"), run this entirely yourself, synchronously, inside this one turn — do not dispatch any background `Agent()` calls for debate turns.
+
+1. **Start the debate.** Run via Bash: `.venv/bin/python3 scripts/debate.py start "<topic>"` using the user's topic verbatim (don't rephrase it into a different question). Note the `debate_id` from the result.
+2. **Launch the viewer if it isn't already running.** Check via Bash: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8765/api/debates`. If this does not print `200`, start the server detached: `nohup .venv/bin/python3 scripts/debate_server.py > /tmp/debate_server.log 2>&1 & disown`. Either way, then run: `open "http://localhost:8765/?debate=<debate_id>"` (substituting the real debate_id) to open the user's browser to this debate.
+3. **Loop until the debate ends:**
+   a. Run `.venv/bin/python3 scripts/debate.py check-timeout <debate_id>`. If the result's `"status"` is `"complete"`, stop looping.
+   b. Run `.venv/bin/python3 scripts/debate.py next-speaker <debate_id>`. If the result's `"next_speaker"` is `null`, stop looping.
+   c. Look up that agent id's subagent name from the "Agent ids and portfolio ids" table above (e.g. `technical_trader` → `technical-trader`). Run `.venv/bin/python3 scripts/debate.py show <debate_id>` to get the full transcript. Using the Agent tool with `run_in_background: false`, dispatch that subagent with a prompt stating this is **debate mode**, giving the topic, the `debate_id`, and the full transcript JSON, and telling it to respond per its own `## Debate mode` instructions.
+   d. Parse the trader's final JSON block (`position_summary`, `argument`, `status`). If it cannot be parsed, or is missing any of those three fields, call `.venv/bin/python3 scripts/debate.py turn <debate_id> <agent_id> --position "<that agent's most recent position from the transcript, or 'unclear' if it has none yet>" --argument "Could not parse this agent's debate reply; treating as settled." --status settle` and continue the loop — never abort the whole debate over one bad reply. Otherwise call `.venv/bin/python3 scripts/debate.py turn <debate_id> <agent_id> --position "<position_summary>" --argument "<argument>" --status <continue|settle>`.
+   e. Go back to step (a).
+4. **Report the outcome.** Run `.venv/bin/python3 scripts/debate.py show <debate_id>` for the final state. Tell the user: each participant's final `position_summary` (if a participant's is `null`, say it never got a turn before time ran out), whether the debate ended because everyone settled or because it hit the 5-minute limit, and that the full transcript is in the already-open browser tab (or give them the URL `http://localhost:8765/?debate=<debate_id>` if they need to reopen it).
