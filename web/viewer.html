@@ -10,15 +10,21 @@
   #status { display: flex; gap: 16px; margin-bottom: 24px; }
   .participant { flex: 1; background: #1a1d24; border-radius: 8px; padding: 12px; }
   .participant img { width: 32px; height: 32px; vertical-align: middle; border-radius: 6px; }
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; display: inline-block; }
   .badge.arguing { background: #2a4; color: #fff; }
   .badge.settled { background: #666; color: #fff; }
+  .badge.stance-buy { background: #1f7a3d; color: #fff; }
+  .badge.stance-sell { background: #8a2a2a; color: #fff; }
+  .badge.stance-hold { background: #555c66; color: #fff; }
+  .badge.conviction-high { background: #3a5fcd; color: #fff; }
+  .badge.conviction-medium { background: #39415c; color: #c7ccd6; }
+  .badge.conviction-low { background: #2a2e3a; color: #8890a0; }
   .position { margin-top: 8px; font-size: 13px; color: #cde; }
   #transcript { display: flex; flex-direction: column; gap: 12px; }
   .turn { background: #181b21; border-radius: 8px; padding: 12px 16px; display: flex; gap: 12px; }
   .turn img { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; }
   .turn .body { flex: 1; }
-  .turn .who { font-weight: 600; font-size: 13px; }
+  .turn .who { font-weight: 600; font-size: 13px; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
   .turn .changed { color: #ffb84d; font-size: 11px; margin-left: 6px; }
   .turn .arg { font-size: 14px; margin-top: 6px; }
   .turn .arg .headline { font-weight: 600; color: #fff; }
@@ -75,6 +81,16 @@ function renderArgument(text) {
   return html;
 }
 
+function stanceBadge(stance) {
+  if (!stance) return "";
+  return `<span class="badge stance-${stance}">${stance}</span>`;
+}
+
+function convictionBadge(conviction) {
+  if (!conviction) return "";
+  return `<span class="badge conviction-${conviction}">${conviction} conviction</span>`;
+}
+
 function renderStatus(participants) {
   const el = document.getElementById("status");
   el.style.display = "flex";
@@ -85,6 +101,8 @@ function renderStatus(participants) {
     return `<div class="participant">
       <img src="${ICONS[agent]}"> <strong>${LABELS[agent]}</strong>
       <span class="badge ${badgeClass}">${p.status === "settled" ? "settled" : "arguing"}</span>
+      ${stanceBadge(p.stance)}
+      ${convictionBadge(p.conviction)}
       <div class="position">${position}</div>
     </div>`;
   }).join("");
@@ -97,6 +115,8 @@ function renderTranscript(turns) {
       <img src="${ICONS[t.agent]}">
       <div class="body">
         <div class="who">${LABELS[t.agent]}
+          ${stanceBadge(t.stance)}
+          ${convictionBadge(t.conviction)}
           ${t.stance_changed ? '<span class="changed">changed stance</span>' : ''}
           ${t.forced_by_timeout ? '<span class="changed">cut off by timer</span>' : ''}
         </div>
