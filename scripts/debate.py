@@ -11,6 +11,7 @@ from pathlib import Path
 VALID_AGENTS = ["technical_trader", "fundamental_trader", "retail_investor"]
 VALID_STATUSES = ("continue", "settle")
 VALID_STANCES = ("buy", "hold", "sell")
+VALID_CONVICTIONS = ("high", "medium", "low")
 TIMEOUT_SECONDS = 300
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -78,7 +79,13 @@ def start_debate(topic):
         "end_time": None,
         "end_reason": None,
         "participants": {
-            agent: {"status": "active", "stance": None, "position_summary": None, "settled_at_turn": None}
+            agent: {
+                "status": "active",
+                "stance": None,
+                "conviction": None,
+                "position_summary": None,
+                "settled_at_turn": None,
+            }
             for agent in VALID_AGENTS
         },
         "turns": [],
@@ -107,11 +114,13 @@ def _active_count(state):
     return sum(1 for p in state["participants"].values() if p["status"] == "active")
 
 
-def append_turn(debate_id, agent, stance, position_summary, argument, status):
+def append_turn(debate_id, agent, stance, conviction, position_summary, argument, status):
     if agent not in VALID_AGENTS:
         raise ValueError(f"unknown agent {agent!r}, must be one of {VALID_AGENTS}")
     if stance not in VALID_STANCES:
         raise ValueError(f"stance must be one of {VALID_STANCES}, got {stance!r}")
+    if conviction not in VALID_CONVICTIONS:
+        raise ValueError(f"conviction must be one of {VALID_CONVICTIONS}, got {conviction!r}")
     if status not in VALID_STATUSES:
         raise ValueError(f"status must be one of {VALID_STATUSES}, got {status!r}")
 
@@ -130,6 +139,7 @@ def append_turn(debate_id, agent, stance, position_summary, argument, status):
         "turn": turn_number,
         "agent": agent,
         "stance": stance,
+        "conviction": conviction,
         "position_summary": position_summary,
         "argument": argument,
         "status": resolved_status,
@@ -139,6 +149,7 @@ def append_turn(debate_id, agent, stance, position_summary, argument, status):
     }
     state["turns"].append(turn)
     state["participants"][agent]["stance"] = stance
+    state["participants"][agent]["conviction"] = conviction
     state["participants"][agent]["position_summary"] = position_summary
     if resolved_status == "settle":
         state["participants"][agent]["status"] = "settled"
@@ -207,6 +218,7 @@ def main():
     p_turn.add_argument("debate_id")
     p_turn.add_argument("agent")
     p_turn.add_argument("--stance", required=True, choices=list(VALID_STANCES))
+    p_turn.add_argument("--conviction", required=True, choices=list(VALID_CONVICTIONS))
     p_turn.add_argument("--position", required=True)
     p_turn.add_argument("--argument", required=True)
     p_turn.add_argument("--status", required=True, choices=list(VALID_STATUSES))
@@ -228,7 +240,7 @@ def main():
             print(json.dumps({"next_speaker": next_speaker(args.debate_id)}))
         elif args.command == "turn":
             print(json.dumps(append_turn(
-                args.debate_id, args.agent, args.stance, args.position, args.argument, args.status,
+                args.debate_id, args.agent, args.stance, args.conviction, args.position, args.argument, args.status,
             )))
         elif args.command == "check-timeout":
             print(json.dumps(check_timeout(args.debate_id)))
