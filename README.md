@@ -47,8 +47,8 @@ It's a way to *see* investing philosophies compete, instead of just reading abou
 **Prerequisite:** this runs inside [Claude Code](https://claude.com/claude-code) — the traders are Claude Code subagents, not a standalone app. Install and sign in to Claude Code first if you haven't already.
 
 ```bash
-git clone <this-repo-url>
-cd "Stock trading"
+git clone https://github.com/sayantan92sanyal/stock-trading-simulation-agents.git
+cd stock-trading-simulation-agents
 
 python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
