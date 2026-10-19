@@ -61,3 +61,18 @@ Each trader posts its own turn directly to `scripts/debate.py` (see their `## De
    d. **Verify the turn landed.** Run `.venv/bin/python3 scripts/debate.py show <debate_id>` again. If the turn count increased and the new turn's `agent` matches who you dispatched, the turn succeeded — move on. If it did not (the agent errored out, skipped posting, or otherwise failed to call `debate.py turn`), fall back yourself: call `.venv/bin/python3 scripts/debate.py turn <debate_id> <agent_id> --stance "<that agent's most recent stance from the transcript, or 'hold' if it has none yet>" --conviction "<that agent's most recent conviction from the transcript, or 'low' if it has none yet>" --position "<that agent's most recent position from the transcript, or 'unclear' if it has none yet>" --argument "This agent failed to post a debate turn; treating as settled." --status settle`. Never abort the whole debate over one bad turn.
    e. Go back to step (a).
 4. **Report the outcome.** Run `.venv/bin/python3 scripts/debate.py show <debate_id>` for the final state. Tell the user: each participant's final `stance`, `conviction`, and `position_summary` (if a participant's is `null`, say it never got a turn before time ran out), whether the debate ended because everyone settled or because it hit the 5-minute limit, and that the full transcript is in the already-open browser tab (or give them the URL `http://localhost:8765/?debate=<debate_id>` if they need to reopen it).
+
+## Running a prediction round
+
+When asked to have the traders guess today's closing price for a list of tickers (e.g. "have the traders predict today's close for NVDA, AVGO, GOOGL"):
+
+Each trader records its own guess directly to `scripts/predictions.py` (see their `## Prediction mode` instructions) — you never parse a trader's reply text to extract a number.
+
+1. **Resolve the date.** Use today's date (`date -u +%Y-%m-%d` via Bash) unless the user specifies one.
+2. **Resolve the ticker list.** Use exactly what the user gave; this feature doesn't infer a universe from a theme.
+3. **Start the round:** `.venv/bin/python3 scripts/predictions.py start <date> <TICKER> <TICKER> ...`. This is a no-op if already started for that date.
+4. **Spawn all three trader subagents in parallel** with subagent_type `technical-trader`, `fundamental-trader`, `retail-investor`, each given the date and the ticker list, and told this is **prediction mode** per their own `## Prediction mode` instructions.
+5. **Verify each trader's predictions landed.** Run `.venv/bin/python3 scripts/predictions.py show <date>` and check that each agent has an entry for every ticker. If an agent is missing some or all tickers, flag it to the user and leave those entries absent — never fabricate a guess on an agent's behalf.
+6. **Report the outcome** to the user: a table of agent × ticker × predicted close × rationale, pulled from `predictions.py show`, not from any trader's prose reply.
+
+To score a past round against actual closes (only meaningful after market close that day), run `.venv/bin/python3 scripts/predictions.py score <date>` and report each agent's error % per ticker, and which agent was closest on each.
